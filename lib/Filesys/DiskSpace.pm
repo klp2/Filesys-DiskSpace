@@ -11,7 +11,7 @@ require 5.003;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(df);
-$VERSION = "0.03";
+$VERSION = "0.04";
 
 # known FS type numbers
 my %fs_type = (
@@ -89,8 +89,17 @@ sub df ($) {
     $res = syscall (&main::SYS_statfs, $dir, $fmt);
     # statfs...
 
-    ($type, $bsize, $blocks, $bfree, $bavail, $files, $ffree) =
-      unpack "L7", $fmt;
+    if ($^O eq 'freebsd') {
+      # only tested with FreeBSD 3.0. Should also work with 4.0.
+      my ($f1, $f2);
+      ($f1, $bsize, $f2, $blocks, $bfree, $bavail, $files, $ffree) =
+	unpack "L8", $fmt;
+      $type = 0; # read it from 'f_type' field ?
+    }
+    else {
+      ($type, $bsize, $blocks, $bfree, $bavail, $files, $ffree) =
+	unpack "L7", $fmt;
+    }
     # type:   type of filesystem (see below)
     # bsize:  optimal transfer block size
     # blocks: total data blocks in file system
@@ -126,8 +135,8 @@ sub df ($) {
       warn "An error occured. statvfs failed. Did you run h2ph?\n";
       $w = 2;
     }
-    if ($^O eq 'linux') {
-      # Tested with $osvers = 2.0.0 and 2.2.2
+    if ($^O eq 'linux' || $^O eq 'freebsd') {
+      # Tested with linux 2.0.0 and 2.2.2
       # No problem if syscall.ph is present.
       warn "An error occured. statfs failed. Did you run h2ph?\n";
     }
@@ -186,7 +195,7 @@ sub df ($) {
 
 Filesys::DiskSpace - Perl df
 
-=head1 SYNOPSYS
+=head1 SYNOPSIS
 
     use Filesys::DiskSpace;
     ($fs_type, $fs_desc, $used, $avail, $fused, $favail) = df $dir;

@@ -11,7 +11,7 @@ local $^W = 1;
 
 my $t = 1;
 
-unless ($^O eq 'linux') {
+unless ($^O eq 'Llinux') {
   print "1..0\n";
   exit;
 }
