@@ -12,7 +12,7 @@ local $^W = 1;
 my $t = 1;
 
 unless ($^O eq 'linux') {
-  print "1..1\nok 1\n";
+  print "1..0\n";
   exit;
 }
 
@@ -22,7 +22,7 @@ my $mnttab = '/etc/mtab';
 my ($data, $dirs);
 open (MOUNT, $mnttab) || die "Error: $!\n";
 while (defined (my $d = <MOUNT>)) {
-  my @tab = split / /, $d;
+  my @tab = split /\s+/, $d;
   push @$dirs, $tab[1] if $tab[2] eq 'vfat';
 }
 close MOUNT;
@@ -41,11 +41,17 @@ close DF;
 
 print "1..", scalar keys %$data, "\n";
 
-# ($fs_type, $fs_desc, $used, $avail, $fused, $favail) = df $dir;
 for my $part (keys %$data) {
   my ($fs_type, $fs_desc, $used, $avail, $fused, $favail) = df $part;
   my $res = $fs_type == 19780 &&
     $$data{$part}{'used'} == $used &&
     $$data{$part}{'avail'} == $avail;
+  unless ($res) {
+    print "Value: system_df perl_df\n\n";
+    print "Used: $$data{$part}{'used'} <> $used\n"
+      unless $$data{$part}{'used'} == $used;
+    print "Avail: $$data{$part}{'avail'} <> $avail\n"
+      unless $$data{$part}{'avail'} == $avail;
+  }
   print $res ? "" : "not ", "ok ", $t++, "\n";
 }

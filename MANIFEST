@@ -5,3 +5,4 @@ README
 lib/Filesys/DiskSpace.pm
 t/linux-ext2.t
 t/linux-vfat.t
+t/solaris-ufs.t

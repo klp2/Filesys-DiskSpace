@@ -11,23 +11,34 @@ require 5.003;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(df);
-$VERSION = "0.02";
+$VERSION = "0.03";
 
+# known FS type numbers
 my %fs_type = (
-     0			=>	"4.2",				# 0x0
-     256		=>	"ufs",				# 0x100
-     2560		=>	"ADVFS",			# 0xA00
-     4989		=>	"EXT_SUPER_MAGIC",		# 0x137D
-     4991		=>	"MINIX_SUPER_MAGIC",		# 0x137F
-     5007		=>	"MINIX_SUPER_MAGIC2",		# 0x138F
-     9320		=>	"NEW_MINIX_SUPER_MAGIC",	# 0x2468
-     19780		=>	"MSDOS_SUPER_MAGIC",		# 0x4d44
-     26985		=>	"NFS_SUPER_MAGIC",		# 0x6969
-     38496		=>	"ISOFS_SUPER_MAGIC",		# 0x9660
-     40864		=>	"PROC_SUPER_MAGIC",		# 0x9fa0
-     61265		=>	"EXT2_OLD_SUPER_MAGIC",		# 0xEF51
-     61267		=>	"EXT2_SUPER_MAGIC",		# 0xEF53
-     19911021		=>	"_XIAFS_SUPER_MAGIC",		# 0x012FD16D
+	       0	  => "4.2",			# 0x00000000
+	       256	  => "UFS",			# 0x00000100
+	       2560	  => "ADVFS",			# 0x00000A00
+	       4989	  => "EXT_SUPER_MAGIC",		# 0x0000137D
+	       4991	  => "MINIX_SUPER_MAGIC",	# 0x0000137F
+	       5007	  => "MINIX_SUPER_MAGIC2",	# 0x0000138F
+	       9320	  => "MINIX2_SUPER_MAGIC",	# 0x00002468
+	       9336	  => "MINIX2_SUPER_MAGIC2",	# 0x00002478
+	       19780	  => "MSDOS_SUPER_MAGIC",	# 0x00004d44
+	       20859	  => "SMB_SUPER_MAGIC",		# 0x0000517B
+	       22092	  => "NCP_SUPER_MAGIC",		# 0x0000564c
+	       26985	  => "NFS_SUPER_MAGIC",		# 0x00006969
+	       38496	  => "ISOFS_SUPER_MAGIC",	# 0x00009660
+	       40864	  => "PROC_SUPER_MAGIC",	# 0x00009fa0
+	       44543      => "AFFS_SUPER_MAGIC",        # 0x0000ADFF
+	       61265	  => "EXT2_OLD_SUPER_MAGIC",	# 0x0000EF51
+	       61267	  => "EXT2_SUPER_MAGIC",	# 0x0000EF53
+	       72020	  => "UFS_MAGIC",		# 0x00011954
+	       19911021	  => "_XIAFS_SUPER_MAGIC",	# 0x012FD16D
+	       19920820	  => "XENIX_SUPER_MAGIC",	# 0x012FF7B4
+	       19920821	  => "SYSV4_SUPER_MAGIC",	# 0x012FF7B5
+	       19920822	  => "SYSV2_SUPER_MAGIC",	# 0x012FF7B6
+	       19920823	  => "COH_SUPER_MAGIC",	        # 0x012FF7B7
+	       4187351113 => "HPFS_SUPER_MAGIC",        # 0xF995E849
 );
 
 sub df ($) {
@@ -42,7 +53,7 @@ sub df ($) {
   Carp::croak "Error: $dir is not a directory" unless -d $dir;
 
   # try with statvfs..
-  eval {  # will works for Solaris 2.*, OSF1 v3.2, OSF1 v4.0 and HP-UX 10.*.
+  eval {  # will work for Solaris 2.*, OSF1 v3.2, OSF1 v4.0 and HP-UX 10.*.
     {
       package main;
       require "sys/syscall.ph";
@@ -51,14 +62,22 @@ sub df ($) {
     $res = syscall (&main::SYS_statvfs, $dir, $fmt) ;
     ($bsize, $frsize, $blocks, $bfree, $bavail, $files, $ffree, $favail) =
       unpack "L8", $fmt;
+    # bsize:  fundamental file system block size
+    # frsize: fragment size
+    # blocks: total blocks of frsize on fs
+    # bfree:  total free blocks of frsize
+    # bavail: free blocks avail to non-superuser
+    # files:  total file nodes (inodes)
+    # ffree:  total free file nodes
+    # favail: free nodes avail to non-superuser
 
     # to stay ok with statfs..
-    $type = 0;
+    $type = 0; # should we try to read it from the structure ?  it looks
+               # possible at least under Solaris.
     $ffree = $favail;
     $bsize = $frsize;
-    $blocks -= $bfree - $bavail;
-    print "res=$res type=$type\n";
-    $res == 0 && $fs_type{$type};
+    # $blocks -= $bfree - $bavail;
+    $res == 0 && defined $fs_type{$type};
   }
   # try with statfs..
   || eval { # will work for SunOS 4, Linux 2.0.* and 2.2.*
@@ -72,8 +91,15 @@ sub df ($) {
 
     ($type, $bsize, $blocks, $bfree, $bavail, $files, $ffree) =
       unpack "L7", $fmt;
+    # type:   type of filesystem (see below)
+    # bsize:  optimal transfer block size
+    # blocks: total data blocks in file system
+    # bfree:  free blocks in fs
+    # bavail: free blocks avail to non-superuser
+    # files:  total file nodes in file system
+    # ffree:  free file nodes in fs
 
-    $res == 0 && $fs_type{$type};
+    $res == 0 && defined $fs_type{$type};
   }
   || eval {
     {
@@ -87,7 +113,7 @@ sub df ($) {
     $res = syscall (&main::SYS_statfs, $dir, $fmt);
     ($type, $flags, $bsize, $frsize, $blocks,
      $bfree, $bavail, $files, $ffree) = unpack "n2i7", $fmt;
-    $res == 0 && $fs_type{$type};
+    $res == 0 && defined $fs_type{$type};
   }
   # Neither statfs nor statvfs.. too bad.
   || eval {
@@ -108,8 +134,8 @@ sub df ($) {
     if ($^O eq 'hpux') {
       if ($osvers == 9) {
 	# Tested. You have to change a line in syscall.ph.
-	warn "An error occured. statfs failed. Did you run h2ph?\n";
-	warn "If you are using a hp9000s700, see the Df documentation\n";
+	warn "An error occured. statfs failed. Did you run h2ph?\n" .
+	  "If you are using a hp9000s700, see the Df documentation\n";
       }
       elsif ($osvers == 10) {
 	# Tested. No problem if syscall.ph is present.
@@ -117,7 +143,7 @@ sub df ($) {
       }
       else {
 	# Untested
-	warn "An error occured. df failed.\n";
+	warn "An error occured. df failed. Please, submit a bug report.\n";
       }
       $w = 3;
     }
@@ -232,9 +258,9 @@ Tested with Perl 5.003 under these systems :
 
 Note for HP-UX users :
 
-   if you got this message :
-   "Undefined subroutine &main::SYS_statfs called at File/Df.pm line XXX"
-   and if you are using a hp9000s700, then edit the syscall.ph file
+   if you obtain this message :
+   "Undefined subroutine &main::SYS_statfs called at Filesys/DiskSpace.pm
+   line XXX" and if you are using a hp9000s700, then edit the syscall.ph file
    (in the Perl lib tree) and copy the line containing "SYS_statfs {196;}"
    outside the "if (defined &__hp9000s800)" block (around line 356).
 
