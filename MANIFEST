@@ -1,0 +1,7 @@
+MANIFEST
+MANIFEST.SKIP
+Makefile.PL
+README
+lib/Filesys/DiskSpace.pm
+t/linux-ext2.t
+t/linux-vfat.t
