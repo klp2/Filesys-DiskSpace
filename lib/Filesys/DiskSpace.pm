@@ -11,7 +11,7 @@ require 5.003;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(df);
-$VERSION = "0.04";
+$VERSION = "0.05";
 
 # known FS type numbers
 my %fs_type = (
